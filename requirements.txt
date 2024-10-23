@@ -1,0 +1,6 @@
+os
+io
+pillow
+requests
+python-dotenv
+tkinter
