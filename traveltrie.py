@@ -1,44 +1,65 @@
-import tkinter as tk
-from tkinter import ttk
-import os
+from tkinter import *
+from tkinter import ttk 
+import subprocess
 
+class TreapNode:
+    def __init__(self, key):
+        self.key = key
+        self.priority = random.randint(1, 100) 
+        self.left = None
+        self.right = None
 
-class TrieNode:
+class Treap:
     def __init__(self):
-        self.children = {}
-        self.is_end_of_word = False
+        self.root = None
 
+    def rotateRight(self, root):
+        leftChild = root.left
+        root.left = leftChild.right
+        leftChild.right = root
+        return leftChild
 
-class Trie:
-    def __init__(self):
-        self.root = TrieNode()
+    def rotateLeft(self, root):
+        rightChild = root.right
+        root.right = rightChild.left
+        rightChild.left = root
+        return rightChild
 
-    def insert(self, word):
-        node = self.root
-        for char in word:
-            if char not in node.children:
-                node.children[char] = TrieNode()
-            node = node.children[char]
-        node.is_end_of_word = True
+    def insert(self, root, key):
+        if root is None:
+            return TreapNode(key)
 
-    def search(self, prefix):
-        node = self.root
-        for char in prefix:
-            if char not in node.children:
-                return []
-            node = node.children[char]
-        return self._get_words_from_node(node)
+        if key < root.key:
+            root.left = self.insert(root.left, key)
+            if root.left.priority > root.priority:
+                root = self.rotateRight(root) 
+        else:
+            root.right = self.insert(root.right, key)
+            if root.right.priority > root.priority:
+                root = self.rotateLeft(root)  
 
-    def _get_words_from_node(self, node):
-        words = []
-        if node.is_end_of_word:
-            words.append("")
-        for char, child_node in node.children.items():
-            suffixes = self._get_words_from_node(child_node)
-            for suffix in suffixes:
-                words.append(char + suffix)
-        return words
+        return root
 
+    def insertNode(self, key):
+        self.root = self.insert(self.root, key)
+
+    def search(self, root, prefix):
+        if root is None:
+            return []
+
+        results = []
+        if root.key.startswith(prefix):
+            results.append(root.key)
+
+        if prefix < root.key:
+            results += self.search(root.left, prefix)
+        else:
+            results += self.search(root.right, prefix)
+
+        return results
+
+    def searchPrefix(self, prefix):
+        return self.search(self.root, prefix)
 
 class LocationGraph:
     def __init__(self):
@@ -54,38 +75,35 @@ class LocationGraph:
             "Ahmedabad to Rome", "Ahmedabad to Tokyo", "Pune to Paris",
             "Pune to Rome", "Pune to Tokyo"
         ]
-        self.trie = Trie()
+        self.treap = Treap()
         for location in self.locations:
-            self.trie.insert(location)
+            self.treap.insertNode(location) 
 
     def search_locations(self, prefix):
-        return self.trie.search(prefix)
-
+        return self.treap.searchPrefix(prefix) 
 
 class App:
     def __init__(self, root):
-        self.root = root
-        self.root.title("Location Search")
-        
-        # Initialize LocationGraph once
+        self.window = root 
+        self.window.title("Location Search")
+
         self.location_graph = LocationGraph()
 
-        self.label = tk.Label(root, text="Select a location:")
+        self.label = Label(self.window, text="Select a location:")
         self.label.pack()
 
-        self.combo_box = ttk.Combobox(root, values=self.location_graph.locations)
+        self.combo_box = ttk.Combobox(self.window, values=self.location_graph.locations)
         self.combo_box.pack()
 
-        self.button = tk.Button(root, text="Search", command=self.handle_search)
+        self.button = Button(self.window, text="Search", command=self.handle_search)
         self.button.pack(pady=10)
 
-        self.result_label = tk.Label(root, text="")
+        self.result_label = Label(self.window, text="")
         self.result_label.pack()
 
-        self.yes_button = tk.Button(root, text="Yes", command=self.execute_weather_code)
-        self.no_button = tk.Button(root, text="No", command=self.display_thank_you)
-        
-        # Initially hide Yes and No buttons
+        self.yes_button = Button(self.window, text="Yes", command=self.execute_weather_code)
+        self.no_button = Button(self.window, text="No", command=self.display_thank_you)
+
         self.yes_button.pack_forget()
         self.no_button.pack_forget()
 
@@ -99,11 +117,7 @@ class App:
         self.no_button.pack()
 
     def execute_weather_code(self):
-        # Using subprocess to avoid closing the current Tkinter window
-        import subprocess
         subprocess.Popen(["python", "weather_treap.py"])
-        # Optionally, you could also keep the current window open
-        self.root.withdraw()  # Hide current window
 
     def display_thank_you(self):
         self.result_label.configure(text="Thank you for using the weather app!")
@@ -114,8 +128,7 @@ class App:
         self.yes_button.pack_forget()
         self.no_button.pack_forget()
 
-
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = Tk()
     app = App(root)
     root.mainloop()
