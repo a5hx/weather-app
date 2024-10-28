@@ -138,7 +138,6 @@ class App:
         self.yes_button.pack_forget()
         self.no_button.pack_forget()
 
-if __name__ == "__main__":
-    root = Tk()
-    app = App(root)
-    root.mainloop()
+root = Tk()
+app = App(root)
+root.mainloop()
