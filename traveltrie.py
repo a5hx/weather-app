@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import ttk 
+import random
 import subprocess
 
 class TreapNode:
@@ -63,24 +64,16 @@ class Treap:
 
 class LocationGraph:
     def __init__(self):
-        self.locations = [
-            "Mumbai to Dubai", "Mumbai to Bali", "Mumbai to Zurich",
-            "Delhi to Dubai", "Delhi to Bali", "Delhi to Zurich",
-            "Bangalore to Dubai", "Bangalore to Bali",
-            "Kolkata to Paris", "Kolkata to Rome", "Kolkata to Tokyo",
-            "Auckland to Kuala Lumpur", "Chennai to Paris",
-            "Chennai to Rome", "Chennai to Tokyo", "Hyderabad to Paris",
-            "Hyderabad to Rome", "Hyderabad to Tokyo", "Jaipur to Paris",
-            "Jaipur to Rome", "Jaipur to Tokyo", "Ahmedabad to Paris",
-            "Ahmedabad to Rome", "Ahmedabad to Tokyo", "Pune to Paris",
-            "Pune to Rome", "Pune to Tokyo"
-        ]
+        self.locations = []
         self.treap = Treap()
-        for location in self.locations:
+
+    def add_locations(self, new_locations):
+        for location in new_locations:
             self.treap.insertNode(location) 
+            self.locations.append(location)
 
     def search_locations(self, prefix):
-        return self.treap.searchPrefix(prefix) 
+        return self.treap.searchPrefix(prefix)
 
 class App:
     def __init__(self, root):
@@ -89,8 +82,17 @@ class App:
 
         self.location_graph = LocationGraph()
 
-        self.label = Label(self.window, text="Select a location:")
+        self.label = Label(self.window, text="Enter locations (comma-separated):")
         self.label.pack()
+
+        self.location_entry = Entry(self.window, width=50)
+        self.location_entry.pack()
+
+        self.submit_button = Button(self.window, text="Submit Locations", command=self.submit_locations)
+        self.submit_button.pack(pady=10)
+
+        self.label_select = Label(self.window, text="Select a location:")
+        self.label_select.pack()
 
         self.combo_box = ttk.Combobox(self.window, values=self.location_graph.locations)
         self.combo_box.pack()
@@ -107,6 +109,15 @@ class App:
         self.yes_button.pack_forget()
         self.no_button.pack_forget()
 
+    def submit_locations(self):
+        locations_input = self.location_entry.get().split(',')
+        new_locations = [loc.strip() for loc in locations_input if loc.strip()]
+
+        self.location_graph.add_locations(new_locations)
+
+        self.combo_box['values'] = self.location_graph.locations
+        self.location_entry.delete(0, END)
+
     def handle_search(self):
         location = self.combo_box.get()
         self.display_results(location)
@@ -122,7 +133,6 @@ class App:
     def display_thank_you(self):
         self.result_label.configure(text="Thank you for using the weather app!")
         
-        # Hide unnecessary widgets
         self.combo_box.pack_forget()
         self.button.pack_forget()
         self.yes_button.pack_forget()
