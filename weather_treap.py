@@ -1,13 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from PIL import Image, ImageTk
 import requests
 import os
 import json
 from dotenv import load_dotenv
 from live_flight_hashmaps import get_flight_details
 from iata import get_iata_code, airports
-
 
 load_dotenv()
 apis_key = os.getenv('weather_api')
@@ -79,6 +77,8 @@ class WeatherApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Weather App")
+        self.root.geometry("600x600")
+        self.root.configure(bg="#f0f0f0")  # Set background color
 
         # Load locations from JSON file
         self.locations = self.load_locations()
@@ -100,22 +100,22 @@ class WeatherApp:
         return []  # Return an empty list if file doesn't exist or is empty
 
     def create_widgets(self):
-        self.location_label = tk.Label(self.root, text="Select location to get weather:")
-        self.location_label.pack(pady=10)
+        self.location_label = tk.Label(self.root, text="Select location to get weather:", bg="#f0f0f0")
+        self.location_label.pack(pady=(20, 10))
 
         self.combo_box = ttk.Combobox(self.root, values=self.locations, state='readonly')
-        self.combo_box.pack(pady=10)
+        self.combo_box.pack(pady=(0, 20))
 
-        self.get_weather_button = tk.Button(self.root, text="Get Weather", command=self.get_weather)
-        self.get_weather_button.pack(pady=10)
+        self.get_weather_button = tk.Button(self.root, text="Get Weather", command=self.get_weather, bg="#4CAF50", fg="white")
+        self.get_weather_button.pack(pady=(0, 10))
 
-        self.get_flights_button = tk.Button(self.root, text="Get Flights", command=self.get_flights)
-        self.get_flights_button.pack(pady=10)
+        self.get_flights_button = tk.Button(self.root, text="Get Flights", command=self.get_flights, bg="#2196F3", fg="white")
+        self.get_flights_button.pack(pady=(0, 20))
 
-        self.weather_frame = tk.Frame(self.root)
+        self.weather_frame = tk.Frame(self.root, bg="#f0f0f0")
         self.weather_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.weather_canvas = tk.Canvas(self.weather_frame)
+        self.weather_canvas = tk.Canvas(self.weather_frame, bg="#f0f0f0")
         self.weather_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.weather_scrollbar = ttk.Scrollbar(self.weather_frame, orient=tk.VERTICAL, command=self.weather_canvas.yview)
@@ -124,11 +124,11 @@ class WeatherApp:
         self.weather_canvas.configure(yscrollcommand=self.weather_scrollbar.set)
         self.weather_canvas.bind('<Configure>', lambda e: self.weather_canvas.configure(scrollregion=self.weather_canvas.bbox("all")))
 
-        self.weather_frame_inner = tk.Frame(self.weather_canvas)
+        self.weather_frame_inner = tk.Frame(self.weather_canvas, bg="#f0f0f0")
         self.weather_canvas.create_window((0, 0), window=self.weather_frame_inner, anchor="nw")
 
     def show_loading_message(self):
-        self.loading_label = tk.Label(self.weather_frame_inner, text="Loading...", justify="center", anchor="center")
+        self.loading_label = tk.Label(self.weather_frame_inner, text="Loading...", justify="center", anchor="center", bg="#f0f0f0")
         self.loading_label.pack(pady=10)
 
     def remove_loading_message(self):
@@ -155,7 +155,7 @@ class WeatherApp:
                            f"Humidity: {humidity}%\n" \
                            f"Description: {description}"
 
-            weather_label = tk.Label(self.weather_frame_inner, text=weather_info, justify="center", anchor="center")
+            weather_label = tk.Label(self.weather_frame_inner, text=weather_info, justify="center", anchor="center", bg="#f0f0f0")
             weather_label.pack(pady=10)
 
             # Center the weather info
@@ -168,7 +168,7 @@ class WeatherApp:
             self.remove_loading_message()  # Remove loading message
 
     def display_error_message(self, message):
-        error_label = tk.Label(self.weather_frame_inner, text=message, justify="center", anchor="center")
+        error_label = tk.Label(self.weather_frame_inner, text=message, justify="center", anchor="center", bg="#f0f0f0")
         error_label.pack(pady=10)
 
     def get_weather(self):
@@ -211,7 +211,7 @@ class WeatherApp:
                 return
 
             # Call the flight details function with the IATA codes
-            self.weather_frame_inner = tk.Frame(self.weather_frame)  # Ensure the result frame is initialized
+            self.weather_frame_inner = tk.Frame(self.weather_frame, bg="#f0f0f0")  # Ensure the result frame is initialized
             self.weather_frame_inner.pack(pady=10)  # Add padding for better spacing
             get_flight_details(departure_iata, arrival_iata, self.weather_frame_inner)
         else:
@@ -220,6 +220,5 @@ class WeatherApp:
 # Ensure the script runs only if it is the main program
 if __name__ == "__main__":
     root = tk.Tk()
-    root.geometry("600x600")
     app = WeatherApp(root)
     root.mainloop()
