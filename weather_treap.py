@@ -1,19 +1,18 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import requests
-import io
-import random
 import os
+import json
 from dotenv import load_dotenv
+from live_flight_hashmaps import get_flight_details
+from iata import get_iata_code, airports
 
 
 load_dotenv()
 apis_key = os.getenv('weather_api')
 
-
-
-class Treapnode:  # Fixed class name to Treapnode
+class TreapNode:
     def __init__(self, key, priority):
         self.key = key
         self.priority = priority
@@ -41,7 +40,7 @@ class Treap:
 
     def _insert(self, node, key, priority):
         if node is None:
-            return Treapnode(key, priority)  # Use correct class name here
+            return TreapNode(key, priority)
 
         if key < node.key:
             node.left = self._insert(node.left, key, priority)
@@ -80,28 +79,35 @@ class WeatherApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Weather App")
-        self.locations = []
-        self.is_dark_mode = tk.BooleanVar()
+
+        # Load locations from JSON file
+        self.locations = self.load_locations()
+
+        # Create widgets
         self.create_widgets()
 
+    def load_locations(self):
+        # Load existing locations from the JSON file
+        if os.path.exists("locations.json"):
+            with open("locations.json", "r") as json_file:
+                content = json_file.read()
+                if content.strip():  # Check if the file is not empty
+                    data = json.loads(content)
+                    return [f"{loc['arrival']} -> {loc['destination']}" for loc in data.get("locations", [])]
+        return []  # Return an empty list if file doesn't exist or is empty
+
     def create_widgets(self):
-        self.num_locations_label = tk.Label(self.root, text="Enter the number of locations you want to add:")
-        self.num_locations_label.pack()
+        self.location_label = tk.Label(self.root, text="Select location to get weather:")
+        self.location_label.pack(pady=10)
 
-        self.num_locations_entry = tk.Entry(self.root)
-        self.num_locations_entry.pack()
-
-        self.location_label = tk.Label(self.root, text="Enter a location:")
-        self.location_label.pack()
-
-        self.location_entry = tk.Entry(self.root)
-        self.location_entry.pack()
-
-        self.add_location_button = tk.Button(self.root, text="Add Location", command=self.add_location)
-        self.add_location_button.pack()
+        self.combo_box = ttk.Combobox(self.root, values=self.locations, state='readonly')
+        self.combo_box.pack(pady=10)
 
         self.get_weather_button = tk.Button(self.root, text="Get Weather", command=self.get_weather)
-        self.get_weather_button.pack()
+        self.get_weather_button.pack(pady=10)
+
+        self.get_flights_button = tk.Button(self.root, text="Get Flights", command=self.get_flights)
+        self.get_flights_button.pack(pady=10)
 
         self.weather_frame = tk.Frame(self.root)
         self.weather_frame.pack(fill=tk.BOTH, expand=True)
@@ -118,124 +124,88 @@ class WeatherApp:
         self.weather_frame_inner = tk.Frame(self.weather_canvas)
         self.weather_canvas.create_window((0, 0), window=self.weather_frame_inner, anchor="nw")
 
-        self.weather_canvas.bind_all("<MouseWheel>", lambda e: self.weather_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-
-        self.treap_label = tk.Label(self.root, text="")
-        self.treap_label.pack()
-
-        self.mode_checkbutton = ttk.Checkbutton(self.root, text="Dark Mode", variable=self.is_dark_mode, command=self.toggle_mode)
-        self.mode_checkbutton.pack()
-
-        self.exit_button = tk.Button(self.root, text="Exit", command=self.root.quit)
-        self.exit_button.pack()
-
-        self.book_flight_label = tk.Label(self.root, text="Do you want to see the flight details?")
-        self.book_flight_label.pack()
-
-        self.yes_button = tk.Button(self.root, text="Yes", command=self.book_flight)
-        self.yes_button.pack()
-
-        self.no_button = tk.Button(self.root, text="No", command=self.display_thank_you)
-        self.no_button.pack()
-
-    def add_location(self):
-        location = self.location_entry.get()
-        if location:  # Check if the location entry is not empty
-            self.locations.append(location)
-            self.location_entry.delete(0, tk.END)
-            print(f"Added location: {location}")  # Debugging info
-        else:
-            print("Location entry is empty.")  # Debugging info
-
     def get_weather(self):
-        api_key = apis_key  # Replace with your API key securely
+        # Correctly retrieve the API key
+        api_key = apis_key  # Use the global apis_key defined at the top
         api_endpoint = 'http://api.openweathermap.org/data/2.5/weather'
-        treap = Treap()
 
-        for location in self.locations:
-            priority = random.randint(1, 100)
+        selected_location = self.combo_box.get()
+        if selected_location:
+            # Split the selected location into departure and arrival
+            locations = selected_location.split(" -> ")
+            departure_location = locations[0]
+            arrival_location = locations[1] if len(locations) > 1 else None
 
-            url = f"{api_endpoint}?appid={api_key}&q={location}"
+            # Clear previous weather information
+            for widget in self.weather_frame_inner.winfo_children():
+                widget.destroy()
 
-            response = requests.get(url)
+            # Get weather for departure location
+            self.fetch_and_display_weather(departure_location)
 
-            if response.status_code == 200:
-                weather_data = response.json()
-                temperature = weather_data['main']['temp']
-                temperature_celsius = temperature - 273.15
-                humidity = weather_data['main']['humidity']
-                description = weather_data['weather'][0]['description']
+            # Get weather for arrival location if it exists
+            if arrival_location:
+                self.fetch_and_display_weather(arrival_location)
 
-                weather_info = f"Weather in {location}:\n" \
-                               f"Temperature: {temperature_celsius:.2f}°C\n" \
-                               f"Humidity: {humidity}%\n" \
-                               f"Description: {description}"
+    def fetch_and_display_weather(self, location_name):
+        api_key = apis_key  # Use the global apis_key defined at the top
+        api_endpoint = 'http://api.openweathermap.org/data/2.5/weather'
+        url = f"{api_endpoint}?appid={api_key}&q={location_name}&units=metric"
+        response = requests.get(url)
 
-                # Add weather advisories
-                if temperature_celsius > 35 and "sun" in description.lower():
-                    weather_info += "\nIt's sunny and the temperature is high. Make sure to put on sunscreen and wear loose, comfortable cotton clothes before leaving your home."
-                if "cloud" in description.lower() or "rain" in description.lower():
-                    weather_info += "\nIt's cloudy or rainy. Remember to bring an umbrella with you."
-                if temperature_celsius < 20:
-                    weather_info += "\nThe temperature is less than 20°C. Come prepared in proper winter clothes of your choice."
-                if temperature_celsius > 45:
-                    weather_info += "\nThe temperature is very high. It's advised to stay in indoor environments and drink plenty of water to avoid heatstroke."
-                if "snow" in description.lower():
-                    weather_info += "\nIt's snowy. Make sure to wear snow boots and appropriate clothes to protect yourself."
+        if response.status_code == 200:
+            weather_data = response.json()
+            temperature = weather_data['main']['temp']
+            humidity = weather_data['main']['humidity']
+            description = weather_data['weather'][0]['description']
 
-                treap.insert(location, priority)
+            weather_info = f"Weather in {location_name}:\n" \
+                        f"Temperature: {temperature:.2f}°C\n" \
+                        f"Humidity: {humidity}%\n" \
+                        f"Description: {description}"
 
-                weather_label = tk.Label(self.weather_frame_inner, text=weather_info)
-                weather_label.pack()
+            weather_label = tk.Label(self.weather_frame_inner, text=weather_info, justify="center", anchor="center")
+            weather_label.pack(pady=10)
 
-                # Load image
-                image_url = f"http://source.unsplash.com/500x300/?{location.replace(' ', '+')}"
-                image_data = requests.get(image_url)
-                if image_data.status_code == 200:
-                    image = Image.open(io.BytesIO(image_data.content))
-                    image = image.resize((500, 300), Image.ANTIALIAS)
-                    photo = ImageTk.PhotoImage(image)
-                    image_label = tk.Label(self.weather_frame_inner, image=photo)
-                    image_label.image = photo
-                    image_label.pack()
-                else:
-                    image_not_found_label = tk.Label(self.weather_frame_inner, text="Image not found")
-                    image_not_found_label.pack()
-            else:
-                error_label = tk.Label(self.weather_frame_inner, text=f"Could not fetch weather for {location}. Please check the name and try again.")
-                error_label.pack()
+            # Center the weather info
+            self.weather_frame_inner.update_idletasks()  # Update the layout
+            self.weather_canvas.config(scrollregion=self.weather_canvas.bbox("all"))
 
-        treap_output = "Treap:\n" + treap.display()
-        self.treap_label.config(text=treap_output)
-
-    def toggle_mode(self):
-        is_dark_mode = self.is_dark_mode.get()
-        if is_dark_mode:
-            self.root.configure(bg="#1e1e1e")
-            self.weather_frame_inner.configure(bg="#1e1e1e")
-            self.treap_label.configure(bg="#1e1e1e", fg="white")
-            self.mode_checkbutton.configure(style="DarkMode.TCheckbutton")
         else:
-            self.root.configure(bg="white")
-            self.weather_frame_inner.configure(bg="white")
-            self.treap_label.configure(bg="white", fg="black")
-            self.mode_checkbutton.configure(style="LightMode.TCheckbutton")
+            error_label = tk.Label(self.weather_frame_inner, text=f"Could not fetch weather for {location_name}. Please check the name and try again.", justify="center", anchor="center")
+            error_label.pack(pady=10)
 
-    def book_flight(self):
-        import subprocess
-        subprocess.Popen(["python", "live_flight_hashmaps.py"])
-        self.root.withdraw()
+    def get_flights(self):
+        selected_location = self.combo_box.get()
+        if selected_location:
+            # Split the selected location into arrival and destination
+            locations = selected_location.split(" -> ")
+            arrival_city = locations[1].strip() if len(locations) > 1 else None
+            departure_city = locations[0].strip()
+            
+            # Get IATA codes for both cities
+            departure_iata = get_iata_code(departure_city, airports)
+            arrival_iata = get_iata_code(arrival_city, airports) if arrival_city else None
 
-    def display_thank_you(self):
-        thank_you_label = tk.Label(self.root, text="Thank you for using our Weather App!")
-        thank_you_label.pack()
+            # Check if IATA codes were found
+            if departure_iata == "No matching airports found.":
+                messagebox.showwarning("Warning", f"Departure city '{departure_city}' not found.")
+                return
+            if arrival_iata == "No matching airports found.":
+                messagebox.showwarning("Warning", f"Arrival city '{arrival_city}' not found.")
+                return
 
-root = tk.Tk()
-root.geometry("600x600")
+            # Call the flight details function with the IATA codes
+            self.weather_frame_inner = tk.Frame(self)  # Ensure the result frame is initialized
+            self.weather_frame_inner.pack(pady=10)  # Add padding for better spacing
+            get_flight_details(departure_iata, arrival_iata, self.weather_frame_inner)
+        else:
+            messagebox.showwarning("Warning", "Please select a valid arrival and destination.")
 
-style = ttk.Style()
-style.configure("DarkMode.TCheckbutton", background="#1e1e1e", foreground="white")
-style.configure("LightMode.TCheckbutton", background="white", foreground="black")
 
-app = WeatherApp(root)
-root.mainloop()
+# Ensure the script runs only if it is the main program
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.geometry("600x600")
+    app = WeatherApp(root)
+    root.mainloop()
