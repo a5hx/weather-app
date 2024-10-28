@@ -25,7 +25,7 @@ airports = {
     "raipur": "RPR",
     "bilaspur": "PAB",
     "jagdalpur": "JGB",
-    "dabolim": "GOI",
+    "dabolim / goa": "GOI",
     "mopa": "GOX",
     "ahmedabad": "AMD",
     "bhavnagar": "BHU",
