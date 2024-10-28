@@ -87,13 +87,16 @@ class WeatherApp:
         self.create_widgets()
 
     def load_locations(self):
-        # Load existing locations from the JSON file
-        if os.path.exists("locations.json"):
-            with open("locations.json", "r") as json_file:
-                content = json_file.read()
-                if content.strip():  # Check if the file is not empty
-                    data = json.loads(content)
-                    return [f"{loc['arrival']} -> {loc['destination']}" for loc in data.get("locations", [])]
+        try:
+            # Load existing locations from the JSON file
+            if os.path.exists("locations.json"):
+                with open("locations.json", "r") as json_file:
+                    content = json_file.read()
+                    if content.strip():  # Check if the file is not empty
+                        data = json.loads(content)
+                        return [f"{loc['arrival']} -> {loc['destination']}" for loc in data.get("locations", [])]
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load locations: {e}")
         return []  # Return an empty list if file doesn't exist or is empty
 
     def create_widgets(self):
@@ -124,11 +127,51 @@ class WeatherApp:
         self.weather_frame_inner = tk.Frame(self.weather_canvas)
         self.weather_canvas.create_window((0, 0), window=self.weather_frame_inner, anchor="nw")
 
-    def get_weather(self):
-        # Correctly retrieve the API key
-        api_key = apis_key  # Use the global apis_key defined at the top
-        api_endpoint = 'http://api.openweathermap.org/data/2.5/weather'
+    def show_loading_message(self):
+        self.loading_label = tk.Label(self.weather_frame_inner, text="Loading...", justify="center", anchor="center")
+        self.loading_label.pack(pady=10)
 
+    def remove_loading_message(self):
+        if hasattr(self, 'loading_label'):
+            self.loading_label.destroy()
+
+    def fetch_and_display_weather(self, location_name):
+        self.show_loading_message()  # Show loading message
+        api_key = apis_key
+        api_endpoint = 'http://api.openweathermap.org/data/2.5/weather'
+        url = f"{api_endpoint}?appid={api_key}&q={location_name}&units=metric"
+        
+        try:
+            response = requests.get(url)
+            response.raise_for_status()  # Raise an error for bad responses
+            weather_data = response.json()
+
+            temperature = weather_data['main']['temp']
+            humidity = weather_data['main']['humidity']
+            description = weather_data['weather'][0]['description']
+
+            weather_info = f"Weather in {location_name}:\n" \
+                           f"Temperature: {temperature:.2f}°C\n" \
+                           f"Humidity: {humidity}%\n" \
+                           f"Description: {description}"
+
+            weather_label = tk.Label(self.weather_frame_inner, text=weather_info, justify="center", anchor="center")
+            weather_label.pack(pady=10)
+
+            # Center the weather info
+            self.weather_frame_inner.update_idletasks()  # Update the layout
+            self.weather_canvas.config(scrollregion=self.weather_canvas.bbox("all"))
+
+        except Exception as e:
+            self.display_error_message(f"Could not fetch weather for {location_name}: {e}")
+        finally:
+            self.remove_loading_message()  # Remove loading message
+
+    def display_error_message(self, message):
+        error_label = tk.Label(self.weather_frame_inner, text=message, justify="center", anchor="center")
+        error_label.pack(pady=10)
+
+    def get_weather(self):
         selected_location = self.combo_box.get()
         if selected_location:
             # Split the selected location into departure and arrival
@@ -146,34 +189,6 @@ class WeatherApp:
             # Get weather for arrival location if it exists
             if arrival_location:
                 self.fetch_and_display_weather(arrival_location)
-
-    def fetch_and_display_weather(self, location_name):
-        api_key = apis_key  # Use the global apis_key defined at the top
-        api_endpoint = 'http://api.openweathermap.org/data/2.5/weather'
-        url = f"{api_endpoint}?appid={api_key}&q={location_name}&units=metric"
-        response = requests.get(url)
-
-        if response.status_code == 200:
-            weather_data = response.json()
-            temperature = weather_data['main']['temp']
-            humidity = weather_data['main']['humidity']
-            description = weather_data['weather'][0]['description']
-
-            weather_info = f"Weather in {location_name}:\n" \
-                        f"Temperature: {temperature:.2f}°C\n" \
-                        f"Humidity: {humidity}%\n" \
-                        f"Description: {description}"
-
-            weather_label = tk.Label(self.weather_frame_inner, text=weather_info, justify="center", anchor="center")
-            weather_label.pack(pady=10)
-
-            # Center the weather info
-            self.weather_frame_inner.update_idletasks()  # Update the layout
-            self.weather_canvas.config(scrollregion=self.weather_canvas.bbox("all"))
-
-        else:
-            error_label = tk.Label(self.weather_frame_inner, text=f"Could not fetch weather for {location_name}. Please check the name and try again.", justify="center", anchor="center")
-            error_label.pack(pady=10)
 
     def get_flights(self):
         selected_location = self.combo_box.get()
@@ -196,12 +211,11 @@ class WeatherApp:
                 return
 
             # Call the flight details function with the IATA codes
-            self.weather_frame_inner = tk.Frame(self)  # Ensure the result frame is initialized
+            self.weather_frame_inner = tk.Frame(self.weather_frame)  # Ensure the result frame is initialized
             self.weather_frame_inner.pack(pady=10)  # Add padding for better spacing
             get_flight_details(departure_iata, arrival_iata, self.weather_frame_inner)
         else:
             messagebox.showwarning("Warning", "Please select a valid arrival and destination.")
-
 
 # Ensure the script runs only if it is the main program
 if __name__ == "__main__":
