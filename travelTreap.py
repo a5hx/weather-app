@@ -129,6 +129,7 @@ class App:
 
     def execute_weather_code(self):
         subprocess.Popen(["python", "weather_treap.py"])
+        self.window.destroy()
 
     def display_thank_you(self):
         self.result_label.configure(text="Thank you for using the weather app!")
