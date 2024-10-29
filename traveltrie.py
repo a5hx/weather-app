@@ -1,5 +1,4 @@
 from tkinter import *
-from tkinter import ttk
 import random
 import subprocess
 import json
@@ -51,73 +50,29 @@ class Treap:
             return []
 
         results = []
-        if root.location.startswith(prefix):
+        if root.location.lower().startswith(prefix.lower()):
             results.append(root.location)
 
-        if prefix < root.location:
-            results += self.search(root.left, prefix)
-        else:
-            results += self.search(root.right, prefix)
+        results += self.search(root.left, prefix)
+        results += self.search(root.right, prefix)
 
         return results
 
     def searchPrefix(self, prefix):
         return self.search(self.root, prefix)
 
-class TrieNode:
-    def __init__(self):
-        self.children = {}
-        self.is_end_of_word = False
-
-class Trie:
-    def __init__(self):
-        self.root = TrieNode()
-
-    def insert(self, word):
-        current = self.root
-        word = word.lower()
-        for char in word:
-            if char not in current.children:
-                current.children[char] = TrieNode()
-            current = current.children[char]
-        current.is_end_of_word = True
-
-    def search(self, prefix):
-        current = self.root
-        prefix = prefix.lower()
-        for char in prefix:
-            if char not in current.children:
-                return []
-            current = current.children[char]
-        return self.findWords(current, prefix)
-
-    def findWords(self, node, prefix):
-        words = []
-        if node.is_end_of_word:
-            words.append(prefix)
-
-        for char, child in node.children.items():
-            words += self.findWords(child, prefix + char)
-
-        return words
-
 class LocationGraph:
     def __init__(self):
         self.locations = []
         self.treap = Treap()
-        self.trie = Trie()
 
     def addLocations(self, newLocations):
         combinedLocation = f"{newLocations[0]} -> {newLocations[1]}"
         self.treap.insertNode(combinedLocation)
-        self.trie.insert(combinedLocation)
         self.locations.append(combinedLocation)
 
     def searchLocations(self, prefix):
         return self.treap.searchPrefix(prefix)
-
-    def autocomplete(self, prefix):
-        return self.trie.search(prefix)
 
 class App:
     def __init__(self, root):
@@ -148,10 +103,12 @@ class App:
 
         self.search_entry = Entry(self.window, width=50)
         self.search_entry.pack(pady=(0, 5))
-        self.search_entry.bind("<KeyRelease>", self.onSearch)
 
-        self.autocomplete_listbox = Listbox(self.window, width=50)
-        self.autocomplete_listbox.pack()
+        self.search_button = Button(self.window, text="Search", command=self.performSearch, bg="#2196F3", fg="white")
+        self.search_button.pack(pady=(5, 20))
+
+        self.result_listbox = Listbox(self.window, width=50)
+        self.result_listbox.pack()
 
         self.result_label = Label(self.window, text="", bg="#f0f0f0")
         self.result_label.pack(pady=(10, 10))
@@ -195,19 +152,22 @@ class App:
 
             self.result_label.configure(text=f"Locations added: {newLocations}")
 
-    def onSearch(self, event):
+    def performSearch(self):
         prefix = self.search_entry.get()
-        suggestions = self.location_graph.autocomplete(prefix)
+        results = self.location_graph.searchLocations(prefix)
 
-        self.autocomplete_listbox.delete(0, END)
+        self.result_listbox.delete(0, END)
 
-        for suggestion in suggestions:
-            self.autocomplete_listbox.insert(END, suggestion)
-
-        if suggestions:
-            self.autocomplete_listbox.pack()
+        if results:
+            for result in results:
+                self.result_listbox.insert(END, result)
         else:
-            self.autocomplete_listbox.place_forget()
+            self.result_label.configure(text="No locations found.")
+        
+        if results:
+            self.result_listbox.pack()
+        else:
+            self.result_listbox.place_forget()
 
     def openWeatherApp(self):
         subprocess.Popen(["python", "weather_treap.py"])
