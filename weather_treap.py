@@ -4,7 +4,7 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
-from live_flight import getFlightDetails
+from liveflight import getFlightDetails
 from iata import getIataCode, airports
 
 load_dotenv()
