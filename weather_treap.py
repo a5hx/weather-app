@@ -4,74 +4,11 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
-from live_flight_hashmaps import get_flight_details
-from iata import get_iata_code, airports
+from live_flight import getFlightDetails
+from iata import getIataCode, airports
 
 load_dotenv()
-apis_key = os.getenv('weather_api')
-
-class TreapNode:
-    def __init__(self, key, priority):
-        self.key = key
-        self.priority = priority
-        self.left = None
-        self.right = None
-
-class Treap:
-    def __init__(self):
-        self.root = None
-
-    def rotate_left(self, node):
-        y = node.right
-        node.right = y.left
-        y.left = node
-        return y
-
-    def rotate_right(self, node):
-        x = node.left
-        node.left = x.right
-        x.right = node
-        return x
-
-    def insert(self, key, priority):
-        self.root = self._insert(self.root, key, priority)
-
-    def _insert(self, node, key, priority):
-        if node is None:
-            return TreapNode(key, priority)
-
-        if key < node.key:
-            node.left = self._insert(node.left, key, priority)
-            if node.left.priority > node.priority:
-                node = self.rotate_right(node)
-        else:
-            node.right = self._insert(node.right, key, priority)
-            if node.right.priority > node.priority:
-                node = self.rotate_left(node)
-
-        return node
-
-    def search(self, key):
-        return self._search(self.root, key)
-
-    def _search(self, node, key):
-        if node is None or node.key == key:
-            return node
-        if key < node.key:
-            return self._search(node.left, key)
-        return self._search(node.right)
-
-    def display(self):
-        return self._display(self.root)
-
-    def _display(self, node, level=0):
-        if node is not None:
-            output = ""
-            output += self._display(node.right, level + 1)
-            output += "    " * level + f"({node.key}, {node.priority})\n"
-            output += self._display(node.left, level + 1)
-            return output
-        return ""
+apiKey = os.getenv('weather_api')
 
 class WeatherApp:
     def __init__(self, root):
@@ -81,17 +18,17 @@ class WeatherApp:
         self.root.configure(bg="#f0f0f0")  # Set background color
 
         # Load locations from JSON file
-        self.locations = self.load_locations()
+        self.locations = self.loadLocations()
 
         # Create widgets
-        self.create_widgets()
+        self.createWidgets()
 
-    def load_locations(self):
+    def loadLocations(self):
         try:
             # Load existing locations from the JSON file
             if os.path.exists("locations.json"):
-                with open("locations.json", "r") as json_file:
-                    content = json_file.read()
+                with open("locations.json", "r") as jsonFile:
+                    content = jsonFile.read()
                     if content.strip():  # Check if the file is not empty
                         data = json.loads(content)
                         return [f"{loc['arrival']} -> {loc['destination']}" for loc in data.get("locations", [])]
@@ -99,121 +36,120 @@ class WeatherApp:
             messagebox.showerror("Error", f"Failed to load locations: {e}")
         return []  # Return an empty list if file doesn't exist or is empty
 
-    def create_widgets(self):
-        self.location_label = tk.Label(self.root, text="Select location to get weather:", bg="#f0f0f0")
-        self.location_label.pack(pady=(20, 10))
+    def createWidgets(self):
+        self.locationLabel = tk.Label(self.root, text="Select location to get weather:", bg="#f0f0f0")
+        self.locationLabel.pack(pady=(20, 10))
 
-        self.combo_box = ttk.Combobox(self.root, values=self.locations, state='readonly')
-        self.combo_box.pack(pady=(0, 20))
+        self.comboBox = ttk.Combobox(self.root, values=self.locations, state='readonly')
+        self.comboBox.pack(pady=(0, 20))
 
-        self.get_weather_button = tk.Button(self.root, text="Get Weather", command=self.get_weather, bg="#4CAF50", fg="white")
-        self.get_weather_button.pack(pady=(0, 10))
+        self.getWeatherButton = tk.Button(self.root, text="Get Weather", command=self.getWeather, bg="#4CAF50", fg="white")
+        self.getWeatherButton.pack(pady=(0, 10))
 
-        self.get_flights_button = tk.Button(self.root, text="Get Flights", command=self.get_flights, bg="#2196F3", fg="white")
-        self.get_flights_button.pack(pady=(0, 20))
+        self.getFlightsButton = tk.Button(self.root, text="Get Flights", command=self.getFlights, bg="#2196F3", fg="white")
+        self.getFlightsButton.pack(pady=(0, 20))
 
-        self.weather_frame = tk.Frame(self.root, bg="#f0f0f0")
-        self.weather_frame.pack(fill=tk.BOTH, expand=True)
+        self.weatherFrame = tk.Frame(self.root, bg="#f0f0f0")
+        self.weatherFrame.pack(fill=tk.BOTH, expand=True)
 
-        self.weather_canvas = tk.Canvas(self.weather_frame, bg="#f0f0f0")
-        self.weather_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.weatherCanvas = tk.Canvas(self.weatherFrame, bg="#f0f0f0")
+        self.weatherCanvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.weather_scrollbar = ttk.Scrollbar(self.weather_frame, orient=tk.VERTICAL, command=self.weather_canvas.yview)
-        self.weather_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.weatherScrollbar = ttk.Scrollbar(self.weatherFrame, orient=tk.VERTICAL, command=self.weatherCanvas.yview)
+        self.weatherScrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.weather_canvas.configure(yscrollcommand=self.weather_scrollbar.set)
-        self.weather_canvas.bind('<Configure>', lambda e: self.weather_canvas.configure(scrollregion=self.weather_canvas.bbox("all")))
+        self.weatherCanvas.configure(yscrollcommand=self.weatherScrollbar.set)
+        self.weatherCanvas.bind('<Configure>', lambda e: self.weatherCanvas.configure(scrollregion=self.weatherCanvas.bbox("all")))
 
-        self.weather_frame_inner = tk.Frame(self.weather_canvas, bg="#f0f0f0")
-        self.weather_canvas.create_window((0, 0), window=self.weather_frame_inner, anchor="nw")
+        self.weatherFrameInner = tk.Frame(self.weatherCanvas, bg="#f0f0f0")
+        self.weatherCanvas.create_window((0, 0), window=self.weatherFrameInner, anchor="nw")
 
-    def show_loading_message(self):
-        self.loading_label = tk.Label(self.weather_frame_inner, text="Loading...", justify="center", anchor="center", bg="#f0f0f0")
-        self.loading_label.pack(pady=10)
+    def showLoadingMessage(self):
+        self.loadingLabel = tk.Label(self.weatherFrameInner, text="Loading...", justify="center", anchor="center", bg="#f0f0f0")
+        self.loadingLabel.pack(pady=10)
 
-    def remove_loading_message(self):
-        if hasattr(self, 'loading_label'):
-            self.loading_label.destroy()
+    def removeLoadingMessage(self):
+        if hasattr(self, 'loadingLabel'):
+            self.loadingLabel.destroy()
 
-    def fetch_and_display_weather(self, location_name):
-        self.show_loading_message()  # Show loading message
-        api_key = apis_key
-        api_endpoint = 'http://api.openweathermap.org/data/2.5/weather'
-        url = f"{api_endpoint}?appid={api_key}&q={location_name}&units=metric"
-        
+    def fetchAndDisplayWeather(self, locationName):
+        self.showLoadingMessage()  # Show loading message
+        apiEndpoint = 'http://api.openweathermap.org/data/2.5/weather'
+        url = f"{apiEndpoint}?appid={apiKey}&q={locationName}&units=metric"
+
         try:
             response = requests.get(url)
             response.raise_for_status()  # Raise an error for bad responses
-            weather_data = response.json()
+            weatherData = response.json()
 
-            temperature = weather_data['main']['temp']
-            humidity = weather_data['main']['humidity']
-            description = weather_data['weather'][0]['description']
+            temperature = weatherData['main']['temp']
+            humidity = weatherData['main']['humidity']
+            description = weatherData['weather'][0]['description']
 
-            weather_info = f"Weather in {location_name}:\n" \
-                           f"Temperature: {temperature:.2f}°C\n" \
-                           f"Humidity: {humidity}%\n" \
-                           f"Description: {description}"
+            weatherInfo = f"Weather in {locationName}:\n" \
+                          f"Temperature: {temperature:.2f}°C\n" \
+                          f"Humidity: {humidity}%\n" \
+                          f"Description: {description}"
 
-            weather_label = tk.Label(self.weather_frame_inner, text=weather_info, justify="center", anchor="center", bg="#f0f0f0")
-            weather_label.pack(pady=10)
+            weatherLabel = tk.Label(self.weatherFrameInner, text=weatherInfo, justify="center", anchor="center", bg="#f0f0f0")
+            weatherLabel.pack(pady=10)
 
             # Center the weather info
-            self.weather_frame_inner.update_idletasks()  # Update the layout
-            self.weather_canvas.config(scrollregion=self.weather_canvas.bbox("all"))
+            self.weatherFrameInner.update_idletasks()  # Update the layout
+            self.weatherCanvas.config(scrollregion=self.weatherCanvas.bbox("all"))
 
         except Exception as e:
-            self.display_error_message(f"Could not fetch weather for {location_name}: {e}")
+            self.displayErrorMessage(f"Could not fetch weather for {locationName}: {e}")
         finally:
-            self.remove_loading_message()  # Remove loading message
+            self.removeLoadingMessage()  # Remove loading message
 
-    def display_error_message(self, message):
-        error_label = tk.Label(self.weather_frame_inner, text=message, justify="center", anchor="center", bg="#f0f0f0")
-        error_label.pack(pady=10)
+    def displayErrorMessage(self, message):
+        errorLabel = tk.Label(self.weatherFrameInner, text=message, justify="center", anchor="center", bg="#f0f0f0")
+        errorLabel.pack(pady=10)
 
-    def get_weather(self):
-        selected_location = self.combo_box.get()
-        if selected_location:
+    def getWeather(self):
+        selectedLocation = self.comboBox.get()
+        if selectedLocation:
             # Split the selected location into departure and arrival
-            locations = selected_location.split(" -> ")
-            departure_location = locations[0]
-            arrival_location = locations[1] if len(locations) > 1 else None
+            locations = selectedLocation.split(" -> ")
+            departureLocation = locations[0]
+            arrivalLocation = locations[1] if len(locations) > 1 else None
 
             # Clear previous weather information
-            for widget in self.weather_frame_inner.winfo_children():
+            for widget in self.weatherFrameInner.winfo_children():
                 widget.destroy()
 
             # Get weather for departure location
-            self.fetch_and_display_weather(departure_location)
+            self.fetchAndDisplayWeather(departureLocation)
 
             # Get weather for arrival location if it exists
-            if arrival_location:
-                self.fetch_and_display_weather(arrival_location)
+            if arrivalLocation:
+                self.fetchAndDisplayWeather(arrivalLocation)
 
-    def get_flights(self):
-        selected_location = self.combo_box.get()
-        if selected_location:
+    def getFlights(self):
+        selectedLocation = self.comboBox.get()
+        if selectedLocation:
             # Split the selected location into arrival and destination
-            locations = selected_location.split(" -> ")
-            arrival_city = locations[1].strip() if len(locations) > 1 else None
-            departure_city = locations[0].strip()
-            
+            locations = selectedLocation.split(" -> ")
+            arrivalCity = locations[1].strip() if len(locations) > 1 else None
+            departureCity = locations[0].strip()
+
             # Get IATA codes for both cities
-            departure_iata = get_iata_code(departure_city, airports)
-            arrival_iata = get_iata_code(arrival_city, airports) if arrival_city else None
+            departureIata = getIataCode(departureCity, airports)
+            arrivalIata = getIataCode(arrivalCity, airports) if arrivalCity else None
 
             # Check if IATA codes were found
-            if departure_iata == "No matching airports found.":
-                messagebox.showwarning("Warning", f"Departure city '{departure_city}' not found.")
+            if departureIata == "No matching airports found.":
+                messagebox.showwarning("Warning", f"Departure city '{departureCity}' not found.")
                 return
-            if arrival_iata == "No matching airports found.":
-                messagebox.showwarning("Warning", f"Arrival city '{arrival_city}' not found.")
+            if arrivalIata == "No matching airports found.":
+                messagebox.showwarning("Warning", f"Arrival city '{arrivalCity}' not found.")
                 return
 
             # Call the flight details function with the IATA codes
-            self.weather_frame_inner = tk.Frame(self.weather_frame, bg="#f0f0f0")  # Ensure the result frame is initialized
-            self.weather_frame_inner.pack(pady=10)  # Add padding for better spacing
-            get_flight_details(departure_iata, arrival_iata, self.weather_frame_inner)
+            self.weatherFrameInner = tk.Frame(self.weatherFrame, bg="#f0f0f0")  # Ensure the result frame is initialized
+            self.weatherFrameInner.pack(pady=10)  # Add padding for better spacing
+            getFlightDetails(departureIata, arrivalIata, self.weatherFrameInner)
         else:
             messagebox.showwarning("Warning", "Please select a valid arrival and destination.")
 

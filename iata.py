@@ -156,10 +156,14 @@ airports = {
     "pondicherry": "PNY"  
 }
 
-def get_iata_code(city_name, airports):
+def getIataCode(city_name, airports):
     city_name = city_name.lower()
+    # Check for exact match first
+    if city_name in airports:
+        return airports[city_name]
+    # Perform partial match if no exact match
     for city, code in airports.items():
         if city_name in city.lower():
-            return code 
-    return "No matching airports found." 
+            return code
+    return "No matching airports found."
 
