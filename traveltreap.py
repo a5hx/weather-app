@@ -75,6 +75,7 @@ class Trie:
 
     def insert(self, word):
         current = self.root
+        word = word.lower()
         for char in word:
             if char not in current.children:
                 current.children[char] = TrieNode()
@@ -83,6 +84,7 @@ class Trie:
 
     def search(self, prefix):
         current = self.root
+        prefix = prefix.lower()
         for char in prefix:
             if char not in current.children:
                 return []
