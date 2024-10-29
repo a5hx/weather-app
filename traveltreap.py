@@ -2,12 +2,12 @@ from tkinter import *
 from tkinter import ttk
 import random
 import subprocess
-import json  # Import json to save locations
-import os  # Import os to handle file operations
+import json
+import os
 
 class TreapNode:
     def __init__(self, location):
-        self.location = location  # Store combined location
+        self.location = location
         self.priority = random.randint(1, 100)
         self.left = None
         self.right = None
@@ -87,15 +87,15 @@ class Trie:
             if char not in current.children:
                 return []
             current = current.children[char]
-        return self._find_words(current, prefix)
+        return self.findWords(current, prefix)
 
-    def _find_words(self, node, prefix):
+    def findWords(self, node, prefix):
         words = []
         if node.is_end_of_word:
             words.append(prefix)
 
         for char, child in node.children.items():
-            words += self._find_words(child, prefix + char)
+            words += self.findWords(child, prefix + char)
 
         return words
 
@@ -105,13 +105,13 @@ class LocationGraph:
         self.treap = Treap()
         self.trie = Trie()
 
-    def add_locations(self, new_locations):
-        combined_location = f"{new_locations[0]} -> {new_locations[1]}"
-        self.treap.insertNode(combined_location)
-        self.trie.insert(combined_location)
-        self.locations.append(combined_location)
+    def addLocations(self, newLocations):
+        combinedLocation = f"{newLocations[0]} -> {newLocations[1]}"
+        self.treap.insertNode(combinedLocation)
+        self.trie.insert(combinedLocation)
+        self.locations.append(combinedLocation)
 
-    def search_locations(self, prefix):
+    def searchLocations(self, prefix):
         return self.treap.searchPrefix(prefix)
 
     def autocomplete(self, prefix):
@@ -121,12 +121,11 @@ class App:
     def __init__(self, root):
         self.window = root
         self.window.title("Location Search")
-        self.window.geometry("400x400")  # Set window size
-        self.window.configure(bg="#f0f0f0")  # Set background color
+        self.window.geometry("400x400")
+        self.window.configure(bg="#f0f0f0")
 
         self.location_graph = LocationGraph()
 
-        # Labels and entries for arrival and destination locations
         self.label_arrival = Label(self.window, text="Enter arrival location:", bg="#f0f0f0")
         self.label_arrival.pack(pady=(20, 5))
 
@@ -139,16 +138,15 @@ class App:
         self.destination_entry = Entry(self.window, width=50)
         self.destination_entry.pack(pady=(0, 20))
 
-        self.submit_button = Button(self.window, text="Submit Locations", command=self.submit_locations, bg="#4CAF50", fg="white")
+        self.submit_button = Button(self.window, text="Submit Locations", command=self.submitLocations, bg="#4CAF50", fg="white")
         self.submit_button.pack(pady=(10, 20))
 
-        # Search field for location autocomplete
         self.label_search = Label(self.window, text="Search locations:", bg="#f0f0f0")
         self.label_search.pack(pady=(10, 5))
 
         self.search_entry = Entry(self.window, width=50)
         self.search_entry.pack(pady=(0, 5))
-        self.search_entry.bind("<KeyRelease>", self.on_search)  # Trigger autocomplete on key release
+        self.search_entry.bind("<KeyRelease>", self.onSearch)
 
         self.autocomplete_listbox = Listbox(self.window, width=50)
         self.autocomplete_listbox.pack()
@@ -156,78 +154,61 @@ class App:
         self.result_label = Label(self.window, text="", bg="#f0f0f0")
         self.result_label.pack(pady=(10, 10))
 
-        # Button to open weather app
-        self.weather_button = Button(self.window, text="Get Weather Info", command=self.open_weather_app, bg="#2196F3", fg="white")
+        self.weather_button = Button(self.window, text="Get Weather Info", command=self.openWeatherApp, bg="#2196F3", fg="white")
         self.weather_button.pack(pady=(20, 10))
 
-        # Bind the close window protocol to the clear_json method
-        self.window.protocol("WM_DELETE_WINDOW", self.clear_json)
+        self.window.protocol("WM_DELETE_WINDOW", self.clearJson)
 
-    def clear_json(self):
-        # Clear the contents of locations.json
+    def clearJson(self):
         if os.path.exists("locations.json"):
-            open("locations.json", "w").close()  # Clear the file
-        self.window.destroy()  # Close the window
+            open("locations.json", "w").close()
+        self.window.destroy()
 
-    def submit_locations(self):
-        arrival_location = self.arrival_entry.get().strip()
-        destination_location = self.destination_entry.get().strip()
+    def submitLocations(self):
+        arrivalLocation = self.arrival_entry.get().strip()
+        destinationLocation = self.destination_entry.get().strip()
 
-        if arrival_location and destination_location:
-            new_locations = [arrival_location, destination_location]
-            self.location_graph.add_locations(new_locations)
+        if arrivalLocation and destinationLocation:
+            newLocations = [arrivalLocation, destinationLocation]
+            self.location_graph.addLocations(newLocations)
 
-            # Load existing locations from the JSON file
-            try:
+            # Handling JSON file
+            data = {"locations": []}
+            if os.path.exists("locations.json"):
                 with open("locations.json", "r") as json_file:
-                    content = json_file.read()
-                    if not content.strip():  # Check if the file is empty
-                        print("JSON file is empty. Initializing with new data.")
-                        data = {"locations": []}
-                    else:
-                        data = json.loads(content)  # Try loading the JSON data
+                    try:
+                        content = json_file.read()
+                        if content.strip():
+                            data = json.loads(content)
+                    except json.JSONDecodeError:
+                        print("Error decoding JSON. Initializing with new data.")
 
-                    if "locations" not in data:
-                        data["locations"] = []
-                    data["locations"].append({"arrival": arrival_location, "destination": destination_location})
+            data["locations"].append({"arrival": arrivalLocation, "destination": destinationLocation})
 
-            except FileNotFoundError:
-                print("File not found. Creating a new JSON file.")
-                data = {"locations": [{"arrival": arrival_location, "destination": destination_location}]}
-            except json.JSONDecodeError:
-                print("Error decoding JSON. Initializing with new data.")
-                data = {"locations": [{"arrival": arrival_location, "destination": destination_location}]}
-            except Exception as e:
-                print(f"An unexpected error occurred: {e}")
-                return
-
-            # Save locations to a JSON file
             with open("locations.json", "w") as json_file:
                 json.dump(data, json_file)
 
             self.arrival_entry.delete(0, END)
             self.destination_entry.delete(0, END)
 
-            self.result_label.configure(text=f"Locations added: {new_locations}")
+            self.result_label.configure(text=f"Locations added: {newLocations}")
 
-    def on_search(self, event):
+    def onSearch(self, event):
         prefix = self.search_entry.get()
         suggestions = self.location_graph.autocomplete(prefix)
 
-        # Clear previous suggestions
         self.autocomplete_listbox.delete(0, END)
 
-        # Add new suggestions
         for suggestion in suggestions:
             self.autocomplete_listbox.insert(END, suggestion)
 
         if suggestions:
-            self.autocomplete_listbox.place(x=20, y=self.search_entry.winfo_y() + 25)
+            self.autocomplete_listbox.pack()
         else:
             self.autocomplete_listbox.place_forget()
 
-    def open_weather_app(self):
-        subprocess.Popen(["python", "weather_treap.py"])  # Open the weather_treap.py
+    def openWeatherApp(self):
+        subprocess.Popen(["python", "weather_treap.py"])
 
 root = Tk()
 app = App(root)
