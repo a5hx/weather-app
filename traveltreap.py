@@ -123,7 +123,7 @@ class App:
     def __init__(self, root):
         self.window = root
         self.window.title("Location Search")
-        self.window.geometry("400x400")
+        self.window.geometry("600x600")
         self.window.configure(bg="#f0f0f0")
 
         self.location_graph = LocationGraph()
